@@ -143,10 +143,7 @@ def storm(
     maximize: bool,
     max_norm: Optional[float] = None,
 ):
-    r"""Functional API that performs SGD algorithm computation.
-
-    See :class:`~torch.optim.SGD` for details.
-    """
+    r"""Functional API that performs STORM algorithm computation."""
 
     if foreach is None:
         # Placeholder for more complex foreach logic to be added when value is not set
