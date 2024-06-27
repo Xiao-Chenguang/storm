@@ -215,7 +215,7 @@ def _multi_tensor_storm(
     params: List[Tensor],
     grads: List[Tensor],
     momentum_buffer_list: List[Optional[Tensor]],
-    other_grads: List[Tensor],
+    prev_d_p_list: List[Tensor],
     *,
     weight_decay: float,
     momentum: float,
@@ -232,7 +232,7 @@ def _multi_tensor_storm(
 
     if maximize:
         grads = torch._foreach_neg(tuple(grads))  # type: ignore[assignment]
-        other_grads = torch._foreach_neg(tuple(other_grads))  # type: ignore[assignment]
+        prev_d_p_list = torch._foreach_neg(tuple(prev_d_p_list))  # type: ignore[assignment]
 
     if weight_decay != 0:
         grads = torch._foreach_add(grads, params, alpha=weight_decay)
@@ -249,7 +249,7 @@ def _multi_tensor_storm(
                 bufs.append(momentum_buffer_list[i])
 
         if all_states_with_momentum_buffer:
-            torch._foreach_sub_(bufs, other_grads)
+            torch._foreach_sub_(bufs, prev_d_p_list)
             torch._foreach_mul_(bufs, momentum)
             torch._foreach_add_(bufs, grads)
         else:
@@ -259,7 +259,7 @@ def _multi_tensor_storm(
                     buf = momentum_buffer_list[i] = torch.clone(grads[i]).detach()
                 else:
                     buf = momentum_buffer_list[i]
-                    buf.sub_(other_grads[i]).mul_(momentum).add_(grads[i])
+                    buf.sub_(prev_d_p_list[i]).mul_(momentum).add_(grads[i])
 
                 bufs.append(buf)
 
