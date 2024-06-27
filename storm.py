@@ -34,13 +34,13 @@ class STORM(Optimizer):
             c=c,
             lr=1,
             momentum=1,
+            max_norm=1e-2,
+            g2=1e-6,
             weight_decay=weight_decay,
             maximize=maximize,
             foreach=foreach,
             differentiable=differentiable,
         )
-        self.k, self.w, self.c = k, w, c
-        self.g2, self.a = 0, 0
         super(STORM, self).__init__(params, defaults)
 
     def __setstate__(self, state):
@@ -84,7 +84,8 @@ class STORM(Optimizer):
             for p in group["params"]:
                 if p.grad is not None:
                     # 1. update G^2: g2 = g2 + ||g||^2
-                    self.g2 += p.grad.norm(2)
+                    group["max_norm"] = max(group["max_norm"], p.grad.norm(2).item())
+                    group["g2"] += p.grad.norm(2)
 
                     params_with_grad.append(p)
                     d_p_list.append(p.grad)
@@ -99,7 +100,7 @@ class STORM(Optimizer):
                     prev_d_p_list.append(state["next_grad"][0])
 
             # 2. update eta: eta = k / (g2 + w)^(1/3)
-            group["lr"] = self.k / ((self.g2 + self.w) ** (1 / 3))
+            group["lr"] = group["k"] * (group["g2"] + group["w"]) ** (-1 / 3)
 
             # 3. update p and d_p
             storm(
@@ -111,6 +112,7 @@ class STORM(Optimizer):
                 momentum=group["momentum"],
                 lr=group["lr"],
                 maximize=group["maximize"],
+                max_norm=group["max_norm"],
                 has_sparse_grad=has_sparse_grad,
                 foreach=group["foreach"],
             )
@@ -121,7 +123,7 @@ class STORM(Optimizer):
                 state["momentum_buffer"] = momentum_buffer
 
             # 4. update momentum a: a = 1 - c * eta^2
-            group["momentum"] = 1 - self.c * group["lr"] ** 2
+            group["momentum"] = 1 - min(1, group["c"] * group["lr"] ** 2)
         return loss
 
 
