@@ -141,6 +141,7 @@ def storm(
     momentum: float,
     lr: float,
     maximize: bool,
+    max_norm: Optional[float] = None,
 ):
     r"""Functional API that performs SGD algorithm computation.
 
@@ -169,6 +170,7 @@ def storm(
         lr=lr,
         has_sparse_grad=has_sparse_grad,
         maximize=maximize,
+        max_norm=max_norm,
     )
 
 
@@ -183,6 +185,7 @@ def _single_tensor_storm(
     lr: float,
     maximize: bool,
     has_sparse_grad: bool,
+    max_norm: Optional[float] = None,
 ):
     for i, param in enumerate(params):
         d_p = d_p_list[i] if not maximize else -d_p_list[i]
@@ -202,6 +205,9 @@ def _single_tensor_storm(
 
             d_p = buf
 
+        if max_norm is not None:
+            d_p = d_p.clamp(-max_norm, max_norm)
+
         param.add_(d_p, alpha=-lr)
 
 
@@ -216,6 +222,7 @@ def _multi_tensor_storm(
     lr: float,
     maximize: bool,
     has_sparse_grad: bool,
+    max_norm: Optional[float] = None,
 ):
     if len(params) == 0:
         return
@@ -257,6 +264,9 @@ def _multi_tensor_storm(
                 bufs.append(buf)
 
         grads = bufs
+
+    if max_norm is not None:
+        grads = [grad.clamp(-max_norm, max_norm) for grad in grads]
 
     if not has_sparse_grad:
         torch._foreach_add_(params, grads, alpha=-lr)
